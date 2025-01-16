@@ -1,21 +1,38 @@
 package com.tenesuzun.atvrnd.ui.screens
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import com.tenesuzun.atvrnd.domain.m3u8List
 import com.tenesuzun.atvrnd.ui.components.VideoPlayer
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun VideoPager(modifier: Modifier = Modifier) {
-    val pagerState = rememberPagerState(pageCount = {
-        10
-    })
-    VerticalPager(state = pagerState) { page ->
-        VideoPlayer(videoUri = "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4")
+fun VideoPager() {
+    val pagerState = rememberPagerState(pageCount = { m3u8List.size })
+    val scope = rememberCoroutineScope()
+
+    VerticalPager(
+        state = pagerState,
+        modifier = Modifier.fillMaxSize(),
+        beyondViewportPageCount = 5
+    ) { page ->
+        Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
+            VideoPlayer(
+                videoUri = m3u8List[page],
+            ) {
+                if (page != m3u8List.size - 1) {
+                    scope.launch {
+                        pagerState.animateScrollToPage(page + 1)
+                    }
+                }
+            }
+        }
     }
 }

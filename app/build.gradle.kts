@@ -1,6 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
+    alias(libs.plugins.hilt) apply false
+    kotlin("kapt")
 }
 
 android {
@@ -71,4 +73,9 @@ dependencies {
     implementation(libs.media.common)
     implementation(libs.exoplayer.dash)
     implementation(libs.exoplayer.hls)
+
+    // dagger
+    implementation(libs.hilt.android)
+
+    implementation(libs.hilt.navigation.compose)
 }
