@@ -38,6 +38,7 @@ fun VideoPlayer(
                 controllerAutoShow = false
                 player = exoPlayer
                 useController = true
+                hideController()
             }
         },
         modifier = modifier

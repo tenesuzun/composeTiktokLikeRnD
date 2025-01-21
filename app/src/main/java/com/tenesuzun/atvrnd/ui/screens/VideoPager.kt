@@ -1,5 +1,6 @@
 package com.tenesuzun.atvrnd.ui.screens
 
+import androidx.annotation.OptIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -15,28 +16,25 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.tenesuzun.atvrnd.domain.m3u8List
+import com.tenesuzun.atvrnd.domain.mp4List
 import kotlin.math.abs
 
+@OptIn(UnstableApi::class)
 @Composable
 fun VideoPager() {
     val context = LocalContext.current
-    val pagerState = rememberPagerState(pageCount = { m3u8List.size })
+//    val pagerState = rememberPagerState(pageCount = { m3u8List.size })
+    val pagerState = rememberPagerState(pageCount = { mp4List.size })
     val scope = rememberCoroutineScope()
 
     val players = remember {
         mutableStateMapOf<Int, ExoPlayer>()
     }
-
-    // Handle pagination - TODO ihtiyaç duyulursa entegre edilebilir
-//    LaunchedEffect(pagerState.currentPage) {
-    // Trigger load more when approaching the end
-//        if (pagerState.currentPage >= m3u8List.size - 5) {
-//            onLoadMore()
-//        }
-//    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -47,10 +45,11 @@ fun VideoPager() {
 
     LaunchedEffect(pagerState.currentPage) {
         val currentPage = pagerState.currentPage
-        val pagesToPreload = 3
+        val pagesToPreload = 5
 
         val startPage = (currentPage - pagesToPreload).coerceAtLeast(0)
-        val endPage = (currentPage + pagesToPreload).coerceAtMost(m3u8List.size - 1)
+        val endPage = (currentPage + pagesToPreload).coerceAtMost(mp4List.size - 1)
+//        val endPage = (currentPage + pagesToPreload).coerceAtMost(m3u8List.size - 1)
 
         val cleanupThreshold = 10
         if (players.size > cleanupThreshold) {
@@ -69,7 +68,8 @@ fun VideoPager() {
                 val player = ExoPlayer.Builder(context).build().apply {
                     repeatMode = ExoPlayer.REPEAT_MODE_ONE
                     playWhenReady = true
-                    setMediaItem(MediaItem.fromUri(m3u8List[page]))
+                    setMediaItem(MediaItem.fromUri(mp4List[page]))
+//                    setMediaItem(MediaItem.fromUri(m3u8List[page]))
                     prepare()
                 }
                 players[page] = player
@@ -85,9 +85,11 @@ fun VideoPager() {
         }
     }
 
-    LaunchedEffect(m3u8List.size) {
+    LaunchedEffect(mp4List.size) {
+//    LaunchedEffect(m3u8List.size) {
         players.keys.toList()
-            .filter { it >= m3u8List.size }
+            .filter { it >= mp4List.size }
+//            .filter { it >= m3u8List.size }
             .forEach { page ->
                 players[page]?.release()
                 players.remove(page)
@@ -105,19 +107,13 @@ fun VideoPager() {
                         PlayerView(context).apply {
                             this.player = player
                             useController = true // false olursa hiç gözükmüyor
+                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
+                            controllerAutoShow = false
+                            hideController()
                         }
                     }, modifier = Modifier.fillMaxSize()
                 )
             }
-//            VideoPlayer(
-//                videoUri = m3u8List[page],
-//            ) {
-//                if (page != m3u8List.size - 1) {
-//                    scope.launch {
-//                        pagerState.animateScrollToPage(page + 1)
-//                    }
-//                }
-//            }
         }
     }
 }
