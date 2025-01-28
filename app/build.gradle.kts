@@ -20,6 +20,15 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        ndk {
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
+        }
+    }
+
+    packaging {
+        resources {
+            pickFirsts += "**/*.so"
+        }
     }
 
     buildTypes {
@@ -31,12 +40,15 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+
+        // byteplus için 1_8 kullanılması gerekebilir
     }
     kotlinOptions {
         jvmTarget = "17"
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.1"
@@ -44,6 +56,11 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+    sourceSets {
+        getByName("main") {
+            assets.srcDirs("src/main/assets")
         }
     }
 }
@@ -76,6 +93,12 @@ dependencies {
 
     // dagger
     implementation(libs.hilt.android)
+
+    //byteplus
+    implementation(libs.byteplus.sdk.player.standard)
+    implementation(libs.okhttp)
+//    implementation ("com.bytedanceapi:ttsdk-player_standard:1.45.100.4")
+//    implementation ("com.bytedance.applog:RangersAppLog-Lite-global:6.14.3")
 
     implementation(libs.hilt.navigation.compose)
 }

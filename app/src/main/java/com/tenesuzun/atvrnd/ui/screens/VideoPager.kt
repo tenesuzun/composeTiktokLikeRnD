@@ -15,6 +15,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -27,6 +30,7 @@ import kotlin.math.abs
 @OptIn(UnstableApi::class)
 @Composable
 fun VideoPager() {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     val context = LocalContext.current
 //    val pagerState = rememberPagerState(pageCount = { m3u8List.size })
     val pagerState = rememberPagerState(pageCount = { mp4List.size })
@@ -34,6 +38,36 @@ fun VideoPager() {
 
     val players = remember {
         mutableStateMapOf<Int, ExoPlayer>()
+    }
+
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    players.values.forEach {
+                        it.pause()
+                    }
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    players.forEach { (page, player) ->
+                        if (page == pagerState.currentPage) {
+                            player.play()
+                        }
+                    }
+                }
+                Lifecycle.Event.ON_STOP -> {
+                    players.values.forEach { it.release() }
+                    players.clear()
+                }
+                else -> {}
+            }
+        }
+
+        lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+        }
     }
 
     DisposableEffect(Unit) {
@@ -85,35 +119,36 @@ fun VideoPager() {
         }
     }
 
-    LaunchedEffect(mp4List.size) {
-//    LaunchedEffect(m3u8List.size) {
-        players.keys.toList()
-            .filter { it >= mp4List.size }
-//            .filter { it >= m3u8List.size }
-            .forEach { page ->
-                players[page]?.release()
-                players.remove(page)
-            }
-    }
+//    LaunchedEffect(mp4List.size) {
+////    LaunchedEffect(m3u8List.size) {
+//        players.keys.toList()
+//            .filter { it >= mp4List.size }
+////            .filter { it >= m3u8List.size }
+//            .forEach { page ->
+//                players[page]?.release()
+//                players.remove(page)
+//            }
+//    }
 
     VerticalPager(
         state = pagerState,
         modifier = Modifier.fillMaxSize(),
     ) { page ->
         Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
-            players[page]?.let { player ->
-                AndroidView(
-                    factory = { context ->
-                        PlayerView(context).apply {
-                            this.player = player
-                            useController = true // false olursa hiç gözükmüyor
-                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
-                            controllerAutoShow = false
-                            hideController()
-                        }
-                    }, modifier = Modifier.fillMaxSize()
-                )
-            }
+            TTVideoEngine(m3u8List[page])
+//            players[page]?.let { player ->
+//                AndroidView(
+//                    factory = { context ->
+//                        PlayerView(context).apply {
+//                            this.player = player
+//                            useController = true // false olursa hiç gözükmüyor
+//                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
+//                            controllerAutoShow = false
+//                            hideController()
+//                        }
+//                    }, modifier = Modifier.fillMaxSize()
+//                )
+//            }
         }
     }
 }

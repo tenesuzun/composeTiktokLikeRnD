@@ -13,6 +13,9 @@ retrofit = "2.11.0"
 logging-interceptor = "4.9.0"
 hilt = "2.51"
 hilt-navigation-compose = "1.2.0"
+byteplus = "1.45.100.4"
+bytedance-applog = "6.16.6"
+okhttp = "4.12.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -41,6 +44,9 @@ retrofit-logging-interceptor = { group = "com.squareup.retrofit2", name = "loggi
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
 hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hilt-navigation-compose" }
+byteplus-sdk-player-standard = { group = "com.bytedanceapi", name = "ttsdk-player_standard", version.ref = "byteplus" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+bytedance-applog = { group = "com.bytedance.applog", name = "RangersAppLog-Lite-global", version.ref = "bytedance-applog" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
