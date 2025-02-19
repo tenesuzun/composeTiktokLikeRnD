@@ -28,8 +28,8 @@ import kotlin.math.abs
 @Composable
 fun VideoPager() {
     val context = LocalContext.current
-//    val pagerState = rememberPagerState(pageCount = { m3u8List.size })
-    val pagerState = rememberPagerState(pageCount = { mp4List.size })
+    val pagerState = rememberPagerState(pageCount = { m3u8List.size })
+//    val pagerState = rememberPagerState(pageCount = { mp4List.size })
     val scope = rememberCoroutineScope()
 
     val players = remember {
@@ -48,8 +48,8 @@ fun VideoPager() {
         val pagesToPreload = 5
 
         val startPage = (currentPage - pagesToPreload).coerceAtLeast(0)
-        val endPage = (currentPage + pagesToPreload).coerceAtMost(mp4List.size - 1)
-//        val endPage = (currentPage + pagesToPreload).coerceAtMost(m3u8List.size - 1)
+//        val endPage = (currentPage + pagesToPreload).coerceAtMost(mp4List.size - 1)
+        val endPage = (currentPage + pagesToPreload).coerceAtMost(m3u8List.size - 1)
 
         val cleanupThreshold = 10
         if (players.size > cleanupThreshold) {
@@ -68,8 +68,8 @@ fun VideoPager() {
                 val player = ExoPlayer.Builder(context).build().apply {
                     repeatMode = ExoPlayer.REPEAT_MODE_ONE
                     playWhenReady = true
-                    setMediaItem(MediaItem.fromUri(mp4List[page]))
-//                    setMediaItem(MediaItem.fromUri(m3u8List[page]))
+//                    setMediaItem(MediaItem.fromUri(mp4List[page]))
+                    setMediaItem(MediaItem.fromUri(m3u8List[page]))
                     prepare()
                 }
                 players[page] = player
@@ -85,11 +85,11 @@ fun VideoPager() {
         }
     }
 
-    LaunchedEffect(mp4List.size) {
-//    LaunchedEffect(m3u8List.size) {
+//    LaunchedEffect(mp4List.size) {
+    LaunchedEffect(m3u8List.size) {
         players.keys.toList()
-            .filter { it >= mp4List.size }
-//            .filter { it >= m3u8List.size }
+//            .filter { it >= mp4List.size }
+            .filter { it >= m3u8List.size }
             .forEach { page ->
                 players[page]?.release()
                 players.remove(page)
