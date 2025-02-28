@@ -1,81 +1,98 @@
 package com.tenesuzun.atvrnd.ui.screens
 
+import android.app.Application
 import androidx.annotation.OptIn
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.MediaItem
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import com.tenesuzun.atvrnd.domain.m3u8List
-import com.tenesuzun.atvrnd.domain.mp4List
-import kotlin.math.abs
+import com.tenesuzun.atvrnd.ui.components.VideoPerformanceMonitor
+import com.tenesuzun.atvrnd.ui.components.VideoRepository
+import com.tenesuzun.atvrnd.ui.components.VideoState
+import com.tenesuzun.atvrnd.ui.viewmodels.VideoPagerViewModel
 
 @OptIn(UnstableApi::class)
 @Composable
-fun VideoPager() {
+fun VideoPager(
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
-    val pagerState = rememberPagerState(pageCount = { m3u8List.size })
-//    val pagerState = rememberPagerState(pageCount = { mp4List.size })
+    val application = context.applicationContext as Application
+
+    val performanceMonitor = remember { VideoPerformanceMonitor() }
+
+    val viewModel: VideoPagerViewModel = viewModel { VideoPagerViewModel(application, VideoRepository(), performanceMonitor) }
+
+    val videos by viewModel.videos.collectAsState()
+    val networkQuality by viewModel.networkQuality.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+
+    val pagerState = rememberPagerState(pageCount = { videos.size })
     val scope = rememberCoroutineScope()
 
-    val players = remember {
-        mutableStateMapOf<Int, ExoPlayer>()
-    }
+    val players = remember { mutableStateMapOf<Int, ExoPlayer>() }
+    val preloadedPlayers = remember { mutableStateListOf<Int>() }
+    val fullyLoadedPlayers = remember { mutableStateListOf<Int>() }
+
 
     DisposableEffect(Unit) {
         onDispose {
             players.values.forEach { it.release() }
             players.clear()
+            preloadedPlayers.clear()
+            fullyLoadedPlayers.clear()
         }
     }
 
-    LaunchedEffect(pagerState.currentPage) {
+    LaunchedEffect(pagerState.currentPage, networkQuality) {
         val currentPage = pagerState.currentPage
         val pagesToPreload = 5
 
         val startPage = (currentPage - pagesToPreload).coerceAtLeast(0)
-//        val endPage = (currentPage + pagesToPreload).coerceAtMost(mp4List.size - 1)
-        val endPage = (currentPage + pagesToPreload).coerceAtMost(m3u8List.size - 1)
+        val endPage = (currentPage + pagesToPreload).coerceAtMost(videos.size - 1)
 
-        val cleanupThreshold = 10
-        if (players.size > cleanupThreshold) {
-            players.keys.toList()
-                .filter { it !in (startPage..endPage) }
-                .sortedBy { abs(it - currentPage) }
-                .take(players.size - cleanupThreshold)
-                .forEach { page ->
-                    players[page]?.release()
-                    players.remove(page)
-                }
-        }
+        // Cleanup old players
+        viewModel.cleanupPlayers(players, currentPage, startPage, endPage)
 
+        // Initialize or update players with current network quality
         (startPage..endPage).forEach { page ->
-            if (!players.containsKey(page)) {
-                val player = ExoPlayer.Builder(context).build().apply {
-                    repeatMode = ExoPlayer.REPEAT_MODE_ONE
-                    playWhenReady = true
-//                    setMediaItem(MediaItem.fromUri(mp4List[page]))
-                    setMediaItem(MediaItem.fromUri(m3u8List[page]))
-                    prepare()
-                }
+            if (!players.containsKey(page) && videos[page] is VideoState.Playing) {
+                val videoState = videos[page] as VideoState.Playing
+
+                performanceMonitor.startLoadingTimer(videoState.videoUrl)
+
+                val player = viewModel.createPlayer(context, videoState.videoUrl, networkQuality, performanceMonitor)
                 players[page] = player
+            } else {
+                // Update existing player's bitrate
+                players[page]?.let { player ->
+                    viewModel.updatePlayerQuality(player, networkQuality)
+                }
             }
         }
 
+        // Play/pause logic
         players.forEach { (page, player) ->
             if (page == currentPage) {
                 player.play()
@@ -85,34 +102,33 @@ fun VideoPager() {
         }
     }
 
-//    LaunchedEffect(mp4List.size) {
-    LaunchedEffect(m3u8List.size) {
-        players.keys.toList()
-//            .filter { it >= mp4List.size }
-            .filter { it >= m3u8List.size }
-            .forEach { page ->
-                players[page]?.release()
-                players.remove(page)
-            }
-    }
-
-    VerticalPager(
-        state = pagerState,
-        modifier = Modifier.fillMaxSize(),
-    ) { page ->
-        Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
-            players[page]?.let { player ->
-                AndroidView(
-                    factory = { context ->
-                        PlayerView(context).apply {
-                            this.player = player
-                            useController = true // false olursa hiç gözükmüyor
-                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
-                            controllerAutoShow = false
-                            hideController()
-                        }
-                    }, modifier = Modifier.fillMaxSize()
-                )
+    if (isLoading) {
+        CircularProgressIndicator(
+            modifier = Modifier.fillMaxSize()
+                .wrapContentSize(Alignment.Center)
+        )
+    } else {
+        VerticalPager(
+            state = pagerState,
+            modifier = modifier.fillMaxSize(),
+        ) { page ->
+            Surface(
+                color = Color.Black,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                players[page]?.let { player ->
+                    AndroidView(
+                        factory = { context ->
+                            PlayerView(context).apply {
+                                this.player = player
+                                useController = false
+                                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
+                                controllerAutoShow = false
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
     }
