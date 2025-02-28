@@ -82,12 +82,36 @@ fun VideoPager(
 
                 performanceMonitor.startLoadingTimer(videoState.videoUrl)
 
-                val player = viewModel.createPlayer(context, videoState.videoUrl, networkQuality, performanceMonitor)
+                val isCurrentOrAdjacent = page == currentPage ||page == currentPage -1 || page == currentPage + 1
+                val previewMode = !isCurrentOrAdjacent
+
+                val player = viewModel.createPlayer(
+                    context = context,
+                    videoUrl = videoState.videoUrl,
+                    networkQuality = networkQuality,
+                    performanceMonitor = performanceMonitor,
+                    previewMode = previewMode,
+                    previewDurationMs = 3000
+                    )
+
                 players[page] = player
+
+                if (previewMode) {
+                    preloadedPlayers.add(page)
+                } else {
+                    fullyLoadedPlayers.add(page)
+                }
+
             } else {
                 // Update existing player's bitrate
                 players[page]?.let { player ->
                     viewModel.updatePlayerQuality(player, networkQuality)
+
+                    if (page == currentPage && preloadedPlayers.contains(page) && !fullyLoadedPlayers.contains(page)) {
+                        viewModel.convertToFullPlayer(context, player, (videos[page] as? VideoState.Playing)?.videoUrl ?: "", networkQuality)
+                        preloadedPlayers.remove(page)
+                        fullyLoadedPlayers.add(page)
+                    }
                 }
             }
         }
