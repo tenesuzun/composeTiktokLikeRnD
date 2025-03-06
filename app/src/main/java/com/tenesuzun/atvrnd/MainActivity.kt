@@ -18,14 +18,16 @@ import com.tenesuzun.atvrnd.ui.theme.AtvRnDTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         enableEdgeToEdge()
 
         setContent {
             AtvRnDTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Surface(modifier = Modifier.padding(innerPadding)) {
+                    innerPadding.calculateTopPadding()
+//                    Surface(modifier = Modifier.padding(innerPadding)) {
                         VideoPager()
-                    }
+//                    }
                 }
             }
         }
