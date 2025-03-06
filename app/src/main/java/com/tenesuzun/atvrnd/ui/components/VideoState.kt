@@ -1,7 +1,7 @@
 package com.tenesuzun.atvrnd.ui.components
 
 sealed class VideoState {
-    data object Loading : VideoState()
+    data class Loading(val videoUrl: String) : VideoState()
     data class Playing(val videoUrl: String) : VideoState()
     data class Error(val message: String) : VideoState()
 }

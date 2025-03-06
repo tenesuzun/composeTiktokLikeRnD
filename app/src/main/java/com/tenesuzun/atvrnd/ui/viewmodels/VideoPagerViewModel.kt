@@ -86,14 +86,14 @@ class VideoPagerViewModel(
 
     private fun loadVideos() {
         viewModelScope.launch {
-            _isLoading.value = true
+//            _isLoading.value = true
             try {
                 val videoUrls = videoRepository.getVideoUrls()
                 _videos.value = videoUrls.map { VideoState.Playing(it) }
             } catch (e: Exception) {
                 _videos.value = listOf(VideoState.Error("Failed to load videos"))
             } finally {
-                _isLoading.value = false
+//                _isLoading.value = false
             }
         }
     }
@@ -128,7 +128,8 @@ class VideoPagerViewModel(
         val trackSelector = DefaultTrackSelector(context).apply {
             setParameters(
                 buildUponParameters()
-                    .setMaxVideoBitrate(networkQuality.bitrate)
+                    .setMaxVideoBitrate(32)
+//                    .setMaxVideoBitrate(networkQuality.bitrate)
                     .setMinVideoBitrate(networkQuality.bitrate / 2)
                     .setForceHighestSupportedBitrate(false) // Only force highest quality for non-preview
                     .setExceedRendererCapabilitiesIfNecessary(true)
@@ -154,22 +155,24 @@ class VideoPagerViewModel(
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
                     Player.STATE_READY -> {
-                        _isLoading.value = false
-                        _isBuffering.value = false
+//                        _isLoading.value = false
+//                        _isBuffering.value = false
                         performanceMonitor.recordPlaybackStart(videoUrl, networkQuality)
                     }
                     Player.STATE_BUFFERING -> {
-                        _isBuffering.value = true
+//                        _isBuffering.value = true
                         bufferingStartTime = System.currentTimeMillis()
                     }
                     Player.STATE_IDLE -> {
-                        _isLoading.value = true
+//                        _isBuffering.value = true
+//                        _isLoading.value = true
                         if (bufferingStartTime > 0) {
                             val bufferingTime = System.currentTimeMillis() - bufferingStartTime
                             performanceMonitor.recordBuffering(videoUrl, bufferingTime)
                             bufferingStartTime = 0
                         }
-                    } else -> {}
+                    }
+                    else -> {}
                 }
             }
         })
