@@ -163,7 +163,8 @@ fun ReelsVideoPlayerOverlay(
 
             // Music info
             Row(
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 24.dp)
             ) {
                 Icon(
                     imageVector = Icons.Filled.PlayArrow,

@@ -31,7 +31,8 @@ class VideoPagerViewModel(
     private val videoRepository: VideoRepository,
     private val performanceMonitor: VideoPerformanceMonitor
 ) : ViewModel() {
-    private val _networkQuality = MutableStateFlow(NetworkQuality.HIGH)
+    private val _networkQuality = MutableStateFlow(NetworkQuality.WIFI)
+//    private val _networkQuality = MutableStateFlow(NetworkQuality.HIGH)
     val networkQuality: StateFlow<NetworkQuality> = _networkQuality.asStateFlow()
 
     private val _videos = MutableStateFlow<List<VideoState>>(emptyList())
@@ -62,7 +63,8 @@ class VideoPagerViewModel(
             }
 
             override fun onLost(network: Network) {
-                _networkQuality.value = NetworkQuality.LOW
+                _networkQuality.value = NetworkQuality.GPRS
+//                _networkQuality.value = NetworkQuality.LOW
             }
         }
 
@@ -72,9 +74,12 @@ class VideoPagerViewModel(
     private fun updateNetworkQuality(networkCapabilities: NetworkCapabilities) {
         val downloadSpeed = networkCapabilities.linkDownstreamBandwidthKbps
         val newQuality = when {
-            downloadSpeed >= 2000 -> NetworkQuality.HIGH
-            downloadSpeed >= 1000 -> NetworkQuality.MEDIUM
-            else -> NetworkQuality.LOW
+            downloadSpeed >= 2000 -> NetworkQuality.WIFI
+            downloadSpeed >= 1500 -> NetworkQuality.FOUR_G
+            downloadSpeed >= 1000 -> NetworkQuality.THREE_G
+            downloadSpeed >= 500 -> NetworkQuality.EDGE
+            else -> NetworkQuality.GPRS
+//            else -> NetworkQuality.LOW
         }
 
         // Only update if quality changed to avoid unnecessary player reconfigurations

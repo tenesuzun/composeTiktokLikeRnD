@@ -2,15 +2,22 @@ package com.tenesuzun.atvrnd.ui.screens
 
 import android.app.Application
 import androidx.annotation.OptIn
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -160,51 +167,34 @@ fun VideoPager(
         }
     }
 
-    var userScrollEnabled by remember { mutableStateOf(true) }
-
-    LaunchedEffect(pagerState.currentPage) {
-        scope.launch(Dispatchers.IO) {
-            userScrollEnabled = false
-            delay(500)
-            userScrollEnabled = true
-        }
-    }
+    /***
+     * Aşağıdakini açmak current page değiştiği anda tetiklendiği için sürüklemeyi bırakmdan currentpage değişince sıradaki videoya snap yapıyor.
+     * DerivedStateOf vb farklı state değerleri kullanıp pagerState.isScrollInProgress ile kontrol ederek denemeler yaptığımda sonuç vermedi.
+     * Current page değiştiğinde eğer scroll yapma veya parmak ekrandan ayrılmadıysa scrollenabled = false olmamalı.
+     */
+//    var userScrollEnabled by remember { mutableStateOf(true) }
+//
+//    LaunchedEffect(pagerState.currentPage) {
+//        scope.launch(Dispatchers.IO) {
+//            userScrollEnabled = false
+//            delay(500)
+//            userScrollEnabled = true
+//        }
+//    }
 
     VerticalPager(
         state = pagerState,
         modifier = modifier.fillMaxSize(),
-        userScrollEnabled = userScrollEnabled
+//        userScrollEnabled = userScrollEnabled
     ) { page ->
         Box(
             modifier = Modifier.fillMaxSize()
         ) {
-            Surface(
-                color = Color.Black,
-                modifier = Modifier.fillMaxSize()
+            Box(
+//                color = Color.Black,
+                modifier = Modifier.fillMaxSize().background(Color.Black)
             ) {
                 players[page]?.let { player ->
-//                    var isPlayerLoading by remember { mutableStateOf(true) }
-//
-//                    player.addListener(object : Player.Listener {
-//                        override fun onPlaybackStateChanged(playbackState: Int) {
-//                            when (playbackState) {
-//                                Player.STATE_READY -> {
-//                                    isPlayerLoading = false
-//                                }
-//
-//                                Player.STATE_BUFFERING -> {
-//                                    isPlayerLoading = false
-//                                }
-//
-//                                Player.STATE_IDLE -> {
-//                                    isPlayerLoading = true
-//                                }
-//
-//                                else -> {}
-//                            }
-//                        }
-//                    })
-
                     AndroidView(
                         factory = { context ->
                             PlayerView(context).apply {
@@ -217,29 +207,20 @@ fun VideoPager(
                         modifier = Modifier
                             .fillMaxSize()
                             .aspectRatio(9f / 21f)
-                            .clickable(
-                                enabled = !pagerState.isScrollInProgress,
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) {
-                                if (player.isPlaying) {
-                                    player.pause()
-                                } else {
-                                    player.play()
-                                }
-                            }
+                            .align(Alignment.Center)
                     )
-//                    if (isPlayerLoading) {
-//                        CircularProgressIndicator(
-//                            modifier = Modifier
-//                                .size(25.dp)
-//                                .align(Alignment.Center),
-//                            color = Color.White,
-//                            trackColor = Color.LightGray,
-//                        )
-//                    }
+
+//                    VideoProgressBar(
+//                        player = player,
+//                        modifier = Modifier
+//                            .fillMaxWidth()
+//                            .height(5.dp)
+//                            .align(Alignment.BottomCenter)
+//                            .navigationBarsPadding()
+//                    )
                 }
             }
+
             val userIndex = page % sampleUsers.size
             val (username, caption, likeCount) = sampleUsers[userIndex]
             val commentCount = "${(1000..5000).random()}"
@@ -248,7 +229,7 @@ fun VideoPager(
                 username = username,
                 caption = caption,
                 likeCount = likeCount,
-                commentCount = commentCount
+                commentCount = commentCount,
             )
         }
     }
