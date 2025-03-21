@@ -214,7 +214,7 @@ class VideoPagerViewModel(
         players: MutableMap<Int, ExoPlayer>,
         currentPage: Int,
         startPage: Int,
-        endPage: Int
+        endPage: Int,
     ) {
         val cleanupThreshold = 10
         if (players.size > cleanupThreshold) {

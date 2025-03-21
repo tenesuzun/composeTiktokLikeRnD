@@ -3,32 +3,24 @@ package com.tenesuzun.atvrnd.ui.screens
 import android.app.Application
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,7 +31,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -48,9 +39,6 @@ import com.tenesuzun.atvrnd.ui.components.VideoPerformanceMonitor
 import com.tenesuzun.atvrnd.ui.components.VideoRepository
 import com.tenesuzun.atvrnd.ui.components.VideoState
 import com.tenesuzun.atvrnd.ui.viewmodels.VideoPagerViewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -67,8 +55,6 @@ fun VideoPager(
 
     val videos by viewModel.videos.collectAsState()
     val networkQuality by viewModel.networkQuality.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val isBuffering by viewModel.isBuffering.collectAsState()
 
     val pagerState = rememberPagerState(pageCount = { videos.size })
     val scope = rememberCoroutineScope()
@@ -185,40 +171,40 @@ fun VideoPager(
     VerticalPager(
         state = pagerState,
         modifier = modifier.fillMaxSize(),
-//        userScrollEnabled = userScrollEnabled
+//        beyondViewportPageCount = 1 (sayfaların heightları sorun oluyor ve performansı yavaşlatıyormuş gibi. Test edilerek optimize edilmesi gerek)
     ) { page ->
         Box(
             modifier = Modifier.fillMaxSize()
         ) {
-            Box(
-//                color = Color.Black,
-                modifier = Modifier.fillMaxSize().background(Color.Black)
-            ) {
-                players[page]?.let { player ->
-                    AndroidView(
-                        factory = { context ->
-                            PlayerView(context).apply {
-                                this.player = player
-                                useController = false
-                                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                                controllerAutoShow = false
-                            }
-                        },
+            players[page]?.let { player ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black)
+                ) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        trackColor = Color.LightGray,
                         modifier = Modifier
-                            .fillMaxSize()
-                            .aspectRatio(9f / 21f)
+                            .width(20.dp)
                             .align(Alignment.Center)
                     )
-
-//                    VideoProgressBar(
-//                        player = player,
-//                        modifier = Modifier
-//                            .fillMaxWidth()
-//                            .height(5.dp)
-//                            .align(Alignment.BottomCenter)
-//                            .navigationBarsPadding()
-//                    )
                 }
+
+                AndroidView(
+                    factory = {
+                        PlayerView(context).apply {
+                            this.player = player
+                            useController = false
+                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                            controllerAutoShow = false
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .aspectRatio(9f / 21f)
+                        .align(Alignment.Center)
+                )
             }
 
             val userIndex = page % sampleUsers.size
@@ -231,6 +217,17 @@ fun VideoPager(
                 likeCount = likeCount,
                 commentCount = commentCount,
             )
+
+            players[page]?.let { player ->
+                VideoProgressBar(
+                    player = player,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(20.dp)
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                )
+            }
         }
     }
 }
