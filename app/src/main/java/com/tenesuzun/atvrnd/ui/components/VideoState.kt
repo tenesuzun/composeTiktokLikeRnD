@@ -1,10 +1,10 @@
 package com.tenesuzun.atvrnd.ui.components
 
-sealed class VideoState {
-    data class Loading(val videoUrl: String) : VideoState()
-    data class Playing(val videoUrl: String) : VideoState()
-    data class Error(val message: String) : VideoState()
-}
+//sealed class VideoState {
+//    data class Loading(val videoUrl: String) : VideoState()
+//    data class Playing(val videoUrl: String) : VideoState()
+//    data class Error(val message: String) : VideoState()
+//}
 
 enum class NetworkQuality(val bitrate: Int) {
 //    LOW(500_000),    // 500kbps

@@ -37,7 +37,6 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.tenesuzun.atvrnd.ui.components.VideoPerformanceMonitor
 import com.tenesuzun.atvrnd.ui.components.VideoRepository
-import com.tenesuzun.atvrnd.ui.components.VideoState
 import com.tenesuzun.atvrnd.ui.viewmodels.VideoPagerViewModel
 
 @OptIn(UnstableApi::class)
@@ -59,9 +58,9 @@ fun VideoPager(
     val pagerState = rememberPagerState(pageCount = { videos.size })
     val scope = rememberCoroutineScope()
 
+    // vertical pager üstünde gezinirken hazırda tutulacak playerların listesi (indeks, player) ikilisi
     val players = remember { mutableStateMapOf<Int, ExoPlayer>() }
 
-    // Sample user data (in a real app, this would come from your data model)
     val sampleUsers = remember {
         listOf(
             Triple("johndoe", "Check out this amazing view! 🏞️ #travel #adventure #vacation", "45.2K"),
@@ -72,7 +71,7 @@ fun VideoPager(
         )
     }
 
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner) { // uygulamanın arkaplanda videoları oynatmaması için
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE -> {
@@ -113,24 +112,25 @@ fun VideoPager(
         }
     }
 
+    // vertical pager üstünde scroll yönüne göre players map içinde instance oluşturulacak playerların hesaplanması
     LaunchedEffect(pagerState.currentPage, networkQuality) {
         val currentPage = pagerState.currentPage
-        val pagesToPreload = 10
+        val pagesToPreload = 10 // mevcut indeksin önünde ve gerisinde hazır tutulacak player sayısı
 
         val startPage = (currentPage - pagesToPreload).coerceAtLeast(0)
         val endPage = (currentPage + pagesToPreload).coerceAtMost(videos.size - 1)
 
-        viewModel.cleanupPlayers(players, currentPage, startPage, endPage)
+        viewModel.cleanupPlayers(players, currentPage, startPage, endPage) // her bir scroll ile fazladan kalan playerlar silinecek
 
         (startPage..endPage).forEach { page ->
-            if (!players.containsKey(page) && videos[page] is VideoState.Playing) {
-                val videoState = videos[page] as VideoState.Playing
+            if (!players.containsKey(page)) {
+                val videoUrl = videos[page]
 
-                performanceMonitor.startLoadingTimer(videoState.videoUrl)
+                performanceMonitor.startLoadingTimer(videoUrl)
 
                 val player = viewModel.createPlayer(
                     context = context,
-                    videoUrl = videoState.videoUrl,
+                    videoUrl = videoUrl,
                     networkQuality = networkQuality,
                     performanceMonitor = performanceMonitor,
                     previewDurationMs = 3000
@@ -176,21 +176,21 @@ fun VideoPager(
         Box(
             modifier = Modifier.fillMaxSize()
         ) {
-            players[page]?.let { player ->
-                Box(
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            ) {
+                CircularProgressIndicator(
+                    color = Color.White,
+                    trackColor = Color.LightGray,
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black)
-                ) {
-                    CircularProgressIndicator(
-                        color = Color.White,
-                        trackColor = Color.LightGray,
-                        modifier = Modifier
-                            .width(20.dp)
-                            .align(Alignment.Center)
-                    )
-                }
+                        .width(20.dp)
+                        .align(Alignment.Center)
+                )
+            }
 
+            players[page]?.let { player ->
                 AndroidView(
                     factory = {
                         PlayerView(context).apply {

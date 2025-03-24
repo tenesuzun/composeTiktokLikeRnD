@@ -13,12 +13,10 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import com.tenesuzun.atvrnd.ui.components.NetworkQuality
 import com.tenesuzun.atvrnd.ui.components.VideoPerformanceMonitor
 import com.tenesuzun.atvrnd.ui.components.VideoRepository
-import com.tenesuzun.atvrnd.ui.components.VideoState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,17 +30,11 @@ class VideoPagerViewModel(
     private val performanceMonitor: VideoPerformanceMonitor
 ) : ViewModel() {
     private val _networkQuality = MutableStateFlow(NetworkQuality.WIFI)
-//    private val _networkQuality = MutableStateFlow(NetworkQuality.HIGH)
+
     val networkQuality: StateFlow<NetworkQuality> = _networkQuality.asStateFlow()
 
-    private val _videos = MutableStateFlow<List<VideoState>>(emptyList())
-    val videos: StateFlow<List<VideoState>> = _videos.asStateFlow()
-
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
-
-    private val _isBuffering = MutableStateFlow(false)
-    val isBuffering: StateFlow<Boolean> = _isBuffering.asStateFlow()
+    private val _videos = MutableStateFlow<List<String>>(emptyList())
+    val videos: StateFlow<List<String>> = _videos.asStateFlow()
 
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
@@ -64,7 +56,6 @@ class VideoPagerViewModel(
 
             override fun onLost(network: Network) {
                 _networkQuality.value = NetworkQuality.GPRS
-//                _networkQuality.value = NetworkQuality.LOW
             }
         }
 
@@ -79,10 +70,8 @@ class VideoPagerViewModel(
             downloadSpeed >= 1000 -> NetworkQuality.THREE_G
             downloadSpeed >= 500 -> NetworkQuality.EDGE
             else -> NetworkQuality.GPRS
-//            else -> NetworkQuality.LOW
         }
 
-        // Only update if quality changed to avoid unnecessary player reconfigurations
         if (_networkQuality.value != newQuality) {
             _networkQuality.value = newQuality
             Log.d("NetworkQuality", "Network quality changed to: ${newQuality.name}, Bandwidth: ${downloadSpeed}kbps")
@@ -91,14 +80,12 @@ class VideoPagerViewModel(
 
     private fun loadVideos() {
         viewModelScope.launch {
-//            _isLoading.value = true
             try {
                 val videoUrls = videoRepository.getVideoUrls()
-                _videos.value = videoUrls.map { VideoState.Playing(it) }
+                _videos.value = videoUrls.map { it }
             } catch (e: Exception) {
-                _videos.value = listOf(VideoState.Error("Failed to load videos"))
+                _videos.value = listOf("Failed to load videos")
             } finally {
-//                _isLoading.value = false
             }
         }
     }
@@ -119,64 +106,57 @@ class VideoPagerViewModel(
         performanceMonitor: VideoPerformanceMonitor,
         previewDurationMs: Long = 3000
     ): ExoPlayer {
-            val loadControl = DefaultLoadControl.Builder()
-                .setBufferDurationsMs(
-                    previewDurationMs.toInt(), // Minimum buffer of 1 second
-                    previewDurationMs.toInt(), // Maximum buffer matches preview duration (3000ms)
-                    500,  // Start playback after 500ms of buffering
-                    1000  // Restart after rebuffering once we have 1 second
-                )
-//                .setTargetBufferBytes(3 * 1024 * 1024) // Limit buffer size (3MB) for preview
-                .setPrioritizeTimeOverSizeThresholds(true)
-                .build()
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                previewDurationMs.toInt(), // Minimum buffer of 1 second
+                previewDurationMs.toInt(), // Maximum buffer matches preview duration (3000ms)
+                500,  // Start playback after 500ms of buffering
+                1000  // Restart after rebuffering once we have 1 second
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
 
         val trackSelector = DefaultTrackSelector(context).apply {
             setParameters(
                 buildUponParameters()
-                    .setMaxVideoBitrate(32)
-//                    .setMaxVideoBitrate(networkQuality.bitrate)
+                    .setMaxVideoBitrate(networkQuality.bitrate)
                     .setMinVideoBitrate(networkQuality.bitrate / 2)
-                    .setForceHighestSupportedBitrate(false) // Only force highest quality for non-preview
+                    .setForceHighestSupportedBitrate(false)
                     .setExceedRendererCapabilitiesIfNecessary(true)
                     .build()
             )
         }
 
-        // Create player with prepared LoadControl and TrackSelector
         val player = ExoPlayer.Builder(context)
             .setTrackSelector(trackSelector)
             .setLoadControl(loadControl)
             .setUseLazyPreparation(false)
             .build()
 
-        // Configure player
         player.repeatMode = ExoPlayer.REPEAT_MODE_ONE
-        player.playWhenReady = false // Don't play until explicitly told to
+        player.playWhenReady = false
 
-        // Add listeners for performance monitoring
         var bufferingStartTime = 0L
 
         player.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
                     Player.STATE_READY -> {
-//                        _isLoading.value = false
-//                        _isBuffering.value = false
                         performanceMonitor.recordPlaybackStart(videoUrl, networkQuality)
                     }
+
                     Player.STATE_BUFFERING -> {
-//                        _isBuffering.value = true
                         bufferingStartTime = System.currentTimeMillis()
                     }
+
                     Player.STATE_IDLE -> {
-//                        _isBuffering.value = true
-//                        _isLoading.value = true
                         if (bufferingStartTime > 0) {
                             val bufferingTime = System.currentTimeMillis() - bufferingStartTime
                             performanceMonitor.recordBuffering(videoUrl, bufferingTime)
                             bufferingStartTime = 0
                         }
                     }
+
                     else -> {}
                 }
             }
@@ -189,7 +169,6 @@ class VideoPagerViewModel(
                 .build()
         )
 
-        // Prepare player
         player.prepare()
 
         return player
@@ -216,7 +195,7 @@ class VideoPagerViewModel(
         startPage: Int,
         endPage: Int,
     ) {
-        val cleanupThreshold = 10
+        val cleanupThreshold = 20
         if (players.size > cleanupThreshold) {
             players.keys.toList()
                 .filter { it !in (startPage..endPage) }
