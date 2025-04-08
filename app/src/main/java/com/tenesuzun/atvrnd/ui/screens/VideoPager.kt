@@ -20,7 +20,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -56,7 +55,6 @@ fun VideoPager(
     val networkQuality by viewModel.networkQuality.collectAsState()
 
     val pagerState = rememberPagerState(pageCount = { videos.size })
-    val scope = rememberCoroutineScope()
 
     // vertical pager üstünde gezinirken hazırda tutulacak playerların listesi (indeks, player) ikilisi
     val players = remember { mutableStateMapOf<Int, ExoPlayer>() }
@@ -223,7 +221,7 @@ fun VideoPager(
                     player = player,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(20.dp)
+                        .height(6.dp)
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
                 )
