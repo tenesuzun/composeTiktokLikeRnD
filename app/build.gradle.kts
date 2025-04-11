@@ -22,10 +22,23 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("old_core")
+            storePassword = "test12"
+            keyAlias = "test"
+            keyPassword = "test12"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+        debug {
+            signingConfig = signingConfigs.getByName("release")
+            isDebuggable = true
         }
     }
     compileOptions {
@@ -78,4 +91,8 @@ dependencies {
     implementation(libs.hilt.android)
 
     implementation(libs.hilt.navigation.compose)
+
+    //coil
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
 }

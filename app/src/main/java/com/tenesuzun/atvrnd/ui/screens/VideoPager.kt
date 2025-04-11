@@ -2,7 +2,6 @@ package com.tenesuzun.atvrnd.ui.screens
 
 import android.app.Application
 import androidx.annotation.OptIn
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -31,33 +32,27 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import com.tenesuzun.atvrnd.ui.components.VideoPerformanceMonitor
+import coil3.compose.AsyncImage
+import com.tenesuzun.atvrnd.ui.components.PlayerClass
 import com.tenesuzun.atvrnd.ui.components.VideoRepository
-import com.tenesuzun.atvrnd.ui.viewmodels.VideoPagerViewModel
+import com.tenesuzun.atvrnd.ui.viewmodels.OperationViewModel
+import kotlin.math.abs
 
 @OptIn(UnstableApi::class)
 @Composable
-fun VideoPager(
-    modifier: Modifier = Modifier,
-) {
+fun VideoPager(modifier: Modifier = Modifier) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
     val application = context.applicationContext as Application
 
-    val performanceMonitor = remember { VideoPerformanceMonitor() }
-
-    val viewModel: VideoPagerViewModel = viewModel { VideoPagerViewModel(application, VideoRepository(), performanceMonitor) }
-
+    val viewModel: OperationViewModel = viewModel { OperationViewModel(application, VideoRepository()) }
     val videos by viewModel.videos.collectAsState()
-    val networkQuality by viewModel.networkQuality.collectAsState()
 
     val pagerState = rememberPagerState(pageCount = { videos.size })
 
-    // vertical pager üstünde gezinirken hazırda tutulacak playerların listesi (indeks, player) ikilisi
-    val players = remember { mutableStateMapOf<Int, ExoPlayer>() }
+    val playerClassList = remember { mutableStateMapOf<Int, PlayerClass>() }
 
     val sampleUsers = remember {
         listOf(
@@ -72,33 +67,21 @@ fun VideoPager(
     DisposableEffect(lifecycleOwner) { // uygulamanın arkaplanda videoları oynatmaması için
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
+                Lifecycle.Event.ON_STOP,
                 Lifecycle.Event.ON_PAUSE -> {
-                    players.keys.forEach {
-                        if (it == pagerState.currentPage) {
-                            players[it]?.pause()
-                        }
-                    }
-                }
-
-                Lifecycle.Event.ON_STOP -> {
-                    players.keys.forEach {
-                        if (it == pagerState.currentPage) {
-                            players[it]?.pause()
-                        }
-                    }
+                    viewModel.isAppInForeground = false
+                    playerClassList[pagerState.currentPage]?.player?.pause()
                 }
 
                 Lifecycle.Event.ON_DESTROY -> {
-                    players.values.forEach { it.release() }
-                    players.clear()
+                    viewModel.isAppInForeground = false
+                    playerClassList[pagerState.currentPage]?.destroy()
+                    playerClassList.clear()
                 }
 
                 Lifecycle.Event.ON_RESUME -> {
-                    players.keys.forEach {
-                        if (it == pagerState.currentPage) {
-                            players[it]?.play()
-                        }
-                    }
+                    viewModel.isAppInForeground = true
+                    playerClassList[pagerState.currentPage]?.player?.play()
                 }
 
                 else -> {}
@@ -111,84 +94,52 @@ fun VideoPager(
     }
 
     // vertical pager üstünde scroll yönüne göre players map içinde instance oluşturulacak playerların hesaplanması
-    LaunchedEffect(pagerState.currentPage, networkQuality) {
-        val currentPage = pagerState.currentPage
-        val pagesToPreload = 10 // mevcut indeksin önünde ve gerisinde hazır tutulacak player sayısı
+    LaunchedEffect(pagerState.currentPage, viewModel.downloadSpeedState) {
+        if (viewModel.isAppInForeground){
+            val currentPage = pagerState.currentPage
+            val pagesToPreload = 5 // mevcut indeksin önünde ve gerisinde hazır tutulacak player sayısı
+            val cleanupThreshold = pagesToPreload * 2
 
-        val startPage = (currentPage - pagesToPreload).coerceAtLeast(0)
-        val endPage = (currentPage + pagesToPreload).coerceAtMost(videos.size - 1)
+            val startPage = (currentPage - pagesToPreload).coerceAtLeast(0)
+            val endPage = (currentPage + pagesToPreload).coerceAtMost(videos.size - 1)
 
-        viewModel.cleanupPlayers(players, currentPage, startPage, endPage) // her bir scroll ile fazladan kalan playerlar silinecek
+            //cleanup
+            if (playerClassList.size > cleanupThreshold) {
+                playerClassList.keys.toList()
+                    .filter { it !in (startPage..endPage) }
+                    .sortedBy { abs(it - currentPage) }
+                    .take(playerClassList.size - cleanupThreshold)
+                    .forEach { page ->
+                        playerClassList[page]?.destroy()
+                        playerClassList.remove(page)
+                    }
+            }
 
-        (startPage..endPage).forEach { page ->
-            if (!players.containsKey(page)) {
-                val videoUrl = videos[page]
-
-                performanceMonitor.startLoadingTimer(videoUrl)
-
-                val player = viewModel.createPlayer(
-                    context = context,
-                    videoUrl = videoUrl,
-                    networkQuality = networkQuality,
-                    performanceMonitor = performanceMonitor,
-                    previewDurationMs = 3000
-                )
-
-                players[page] = player
-            } else {
-                players[page]?.let { player ->
-                    viewModel.updatePlayerQuality(player, networkQuality)
+            (startPage..endPage).forEach { page ->
+                if (!playerClassList.containsKey(page)) {
+                    val videoUrl = videos[page]
+                    playerClassList[page] = PlayerClass(application, videoUrl, 3000, page)
+                } else {
+                    playerClassList[page]?.updatePlayerQuality(viewModel.calculateBitrateByDownloadSpeed())
                 }
             }
-        }
 
-        players.forEach { (page, player) ->
-            if (page == currentPage) {
-                player.play()
-            } else {
-                player.pause()
+            playerClassList.forEach { (page, vm) ->
+                if (page == currentPage) {
+                    vm.player?.play()
+                } else {
+                    vm.player?.pause()
+                }
             }
         }
     }
 
-    /***
-     * Aşağıdakini açmak current page değiştiği anda tetiklendiği için sürüklemeyi bırakmdan currentpage değişince sıradaki videoya snap yapıyor.
-     * DerivedStateOf vb farklı state değerleri kullanıp pagerState.isScrollInProgress ile kontrol ederek denemeler yaptığımda sonuç vermedi.
-     * Current page değiştiğinde eğer scroll yapma veya parmak ekrandan ayrılmadıysa scrollenabled = false olmamalı.
-     */
-//    var userScrollEnabled by remember { mutableStateOf(true) }
-//
-//    LaunchedEffect(pagerState.currentPage) {
-//        scope.launch(Dispatchers.IO) {
-//            userScrollEnabled = false
-//            delay(500)
-//            userScrollEnabled = true
-//        }
-//    }
-
     VerticalPager(
         state = pagerState,
-        modifier = modifier.fillMaxSize(),
-//        beyondViewportPageCount = 1 (sayfaların heightları sorun oluyor ve performansı yavaşlatıyormuş gibi. Test edilerek optimize edilmesi gerek)
+        modifier = modifier.fillMaxSize()
     ) { page ->
-        Box(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black)
-            ) {
-                CircularProgressIndicator(
-                    color = Color.White,
-                    trackColor = Color.LightGray,
-                    modifier = Modifier
-                        .width(20.dp)
-                        .align(Alignment.Center)
-                )
-            }
-
-            players[page]?.let { player ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            playerClassList[page]?.player?.let { player ->
                 AndroidView(
                     factory = {
                         PlayerView(context).apply {
@@ -216,7 +167,7 @@ fun VideoPager(
                 commentCount = commentCount,
             )
 
-            players[page]?.let { player ->
+            playerClassList[page]?.player?.let { player ->
                 VideoProgressBar(
                     player = player,
                     modifier = Modifier
@@ -225,6 +176,51 @@ fun VideoPager(
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
                 )
+            }
+
+            Surface(color = Color.Transparent) {
+                playerClassList[page]?.let {
+                    if (it.thumbnailShownState) {
+                        AsyncImage(
+                            //model = "https://picsum.photos/1080/1920",
+                            model = "https://fastly.picsum.photos/id/483/1080/1920.jpg?hmac=LNLgDQ4_MQtLPbAWO-YIST02WsMf7xXf6auFl9zwnO4",
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    if (it.thumbnailShownState) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            CircularProgressIndicator(
+                                color = Color.White,
+                                trackColor = Color.LightGray,
+                                modifier = Modifier
+                                    .width(30.dp)
+                                    .align(Alignment.Center)
+                            )
+                        }
+                    }
+                    /*Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) { // hız ve sayfa no bilgisi
+                        Text(
+                            text = "Hız:${viewModel.downloadSpeedState}",
+                            color = Color.Green,
+                            modifier = Modifier
+                                .padding(start = 15.dp, top = 30.dp)
+                                .background(Color.Black)
+                                .padding(5.dp),
+                            fontSize = 21.sp
+                        )
+                        Text(
+                            text = "Sayfa:$page",
+                            color = Color.Green,
+                            modifier = Modifier
+                                .padding(end = 15.dp, top = 30.dp)
+                                .background(Color.Black)
+                                .padding(5.dp),
+                            fontSize = 21.sp
+                        )
+                    }*/
+                }
             }
         }
     }
