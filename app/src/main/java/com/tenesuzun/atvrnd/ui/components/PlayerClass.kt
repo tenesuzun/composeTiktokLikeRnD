@@ -26,6 +26,7 @@ class PlayerClass(
     var playerState by mutableIntStateOf(Player.STATE_IDLE)
     var thumbnailShownState by mutableStateOf(true)
 
+    // buffer ayarları
     private val loadControl = DefaultLoadControl.Builder()
         .setBufferDurationsMs(
             previewDurationMs.toInt(), // Minimum buffer of 1 second
@@ -36,6 +37,7 @@ class PlayerClass(
         .setPrioritizeTimeOverSizeThresholds(true)
         .build()
 
+    // bitrate ve çözünürlük ayarları
     private val trackSelector = DefaultTrackSelector(applicationContext).apply {
         setParameters(
             buildUponParameters()
@@ -50,8 +52,8 @@ class PlayerClass(
         )
     }
 
-    private val renderersFactory =
-        DefaultRenderersFactory(applicationContext).setEnableDecoderFallback(true) // Donanımsal decoder çalışmazsa yedek kullansın
+    // codec slotu dolduğunda yedek codec (software) kullanması için, aksi halde codec slotu dolu olduğunda thumbnail'da kalıyor ve player tepki vermiyor
+    private val renderersFactory = DefaultRenderersFactory(applicationContext).setEnableDecoderFallback(true)
 
     var player: ExoPlayer? = ExoPlayer.Builder(applicationContext, renderersFactory)
         .setTrackSelector(trackSelector)

@@ -81,6 +81,7 @@ fun VideoPager(modifier: Modifier = Modifier) {
 
                 Lifecycle.Event.ON_RESUME -> {
                     viewModel.isAppInForeground = true
+                    viewModel.observeNetworkQuality()
                     playerClassList[pagerState.currentPage]?.player?.play()
                 }
 
@@ -93,42 +94,45 @@ fun VideoPager(modifier: Modifier = Modifier) {
         }
     }
 
-    // vertical pager üstünde scroll yönüne göre players map içinde instance oluşturulacak playerların hesaplanması
-    LaunchedEffect(pagerState.currentPage, viewModel.downloadSpeedState) {
-        if (viewModel.isAppInForeground){
-            val currentPage = pagerState.currentPage
-            val pagesToPreload = 5 // mevcut indeksin önünde ve gerisinde hazır tutulacak player sayısı
-            val cleanupThreshold = pagesToPreload * 2
+    Surface(color = Color.Transparent) {
+        LaunchedEffect(pagerState.currentPage, viewModel.downloadSpeedState) {
+            if (viewModel.isAppInForeground) {
+                val currentPage = pagerState.currentPage
+                val pagesToPreload = 5 // mevcut indeksin önünde ve gerisinde hazır tutulacak player sayısı
+                val cleanupThreshold = pagesToPreload * 2
 
-            val startPage = (currentPage - pagesToPreload).coerceAtLeast(0)
-            val endPage = (currentPage + pagesToPreload).coerceAtMost(videos.size - 1)
+                val startPage = (currentPage - pagesToPreload).coerceAtLeast(0)
+                val endPage = (currentPage + pagesToPreload).coerceAtMost(videos.size - 1)
 
-            //cleanup
-            if (playerClassList.size > cleanupThreshold) {
-                playerClassList.keys.toList()
-                    .filter { it !in (startPage..endPage) }
-                    .sortedBy { abs(it - currentPage) }
-                    .take(playerClassList.size - cleanupThreshold)
-                    .forEach { page ->
-                        playerClassList[page]?.destroy()
-                        playerClassList.remove(page)
-                    }
-            }
-
-            (startPage..endPage).forEach { page ->
-                if (!playerClassList.containsKey(page)) {
-                    val videoUrl = videos[page]
-                    playerClassList[page] = PlayerClass(application, videoUrl, 3000, page)
-                } else {
-                    playerClassList[page]?.updatePlayerQuality(viewModel.calculateBitrateByDownloadSpeed())
+                // cleanup - range dışındaki player'ları siler
+                if (playerClassList.size > cleanupThreshold) {
+                    playerClassList.keys.toList()
+                        .filter { it !in (startPage..endPage) }
+                        .sortedBy { abs(it - currentPage) }
+                        .take(playerClassList.size - cleanupThreshold)
+                        .forEach { page ->
+                            playerClassList[page]?.destroy()
+                            playerClassList.remove(page)
+                        }
                 }
-            }
 
-            playerClassList.forEach { (page, vm) ->
-                if (page == currentPage) {
-                    vm.player?.play()
-                } else {
-                    vm.player?.pause()
+                // caching and update quality
+                (startPage..endPage).forEach { page ->
+                    if (!playerClassList.containsKey(page)) { // range içerisine giren player'ı cache'leme
+                        val videoUrl = videos[page]
+                        playerClassList[page] = PlayerClass(application, videoUrl, 3000, page)
+                    } else { // sayfadaki player'ın bitrate'ini güncelleme
+                        playerClassList[page]?.updatePlayerQuality(viewModel.calculateBitrateByDownloadSpeed())
+                    }
+                }
+
+                // autoplay
+                playerClassList.forEach { (page, vm) ->
+                    if (page == currentPage) {
+                        vm.player?.play()
+                    } else {
+                        vm.player?.pause()
+                    }
                 }
             }
         }
@@ -167,21 +171,22 @@ fun VideoPager(modifier: Modifier = Modifier) {
                 commentCount = commentCount,
             )
 
-            playerClassList[page]?.player?.let { player ->
-                VideoProgressBar(
-                    player = player,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                )
+            Surface(color = Color.Transparent, modifier = Modifier.align(Alignment.BottomCenter)) { // progress
+                playerClassList[page]?.player?.let { player ->
+                    VideoProgressBar(
+                        player = player,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .navigationBarsPadding()
+                    )
+                }
             }
 
             Surface(color = Color.Transparent) {
                 playerClassList[page]?.let {
                     if (it.thumbnailShownState) {
-                        AsyncImage(
+                        AsyncImage( // thumbnail
                             //model = "https://picsum.photos/1080/1920",
                             model = "https://fastly.picsum.photos/id/483/1080/1920.jpg?hmac=LNLgDQ4_MQtLPbAWO-YIST02WsMf7xXf6auFl9zwnO4",
                             contentDescription = null,
@@ -190,7 +195,7 @@ fun VideoPager(modifier: Modifier = Modifier) {
                         )
                     }
                     if (it.thumbnailShownState) {
-                        Box(modifier = Modifier.fillMaxSize()) {
+                        Box(modifier = Modifier.fillMaxSize()) { // loading
                             CircularProgressIndicator(
                                 color = Color.White,
                                 trackColor = Color.LightGray,

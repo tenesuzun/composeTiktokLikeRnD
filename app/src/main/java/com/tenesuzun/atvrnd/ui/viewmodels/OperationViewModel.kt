@@ -11,6 +11,7 @@ import androidx.media3.common.util.UnstableApi
 import com.tenesuzun.atvrnd.ui.components.BitrateTypes
 import com.tenesuzun.atvrnd.ui.components.VideoRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,18 +34,21 @@ class OperationViewModel(
     var downloadSpeedState by mutableIntStateOf(0)
 
     init {
-        observeNetworkQuality()
+        //observeNetworkQuality()
         loadVideos()
     }
 
-    private fun observeNetworkQuality() {
+    fun observeNetworkQuality() {
         viewModelScope.launch(Dispatchers.IO) {
             while (true) {
                 if (isAppInForeground) {
                     downloadSpeedState = measureActualDownloadSpeedKbps()
                     delay(3000)
+                } else {
+                    break
                 }
             }
+            cancel()
         }
     }
 
